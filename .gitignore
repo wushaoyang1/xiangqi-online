@@ -1,0 +1,12 @@
+# 运行时状态：由服务器自动生成，含累计段位/邀请关系/好友/赛季，无需入库
+ratings.json
+invites.json
+friends.json
+seasons.json
+
+# 本地日志与临时预览目录
+_server.log
+_preview/
+
+# 依赖（本项目零依赖，仅防误装）
+node_modules/

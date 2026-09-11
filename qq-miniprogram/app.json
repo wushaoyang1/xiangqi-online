@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "暗棋象棋",
+    "navigationBarBackgroundColor": "#1b1b2f",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#1b1b2f"
+  },
+  "sitemapLocation": "sitemap.json",
+  "permission": {}
+}

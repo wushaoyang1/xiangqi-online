@@ -1,0 +1,13 @@
+{
+  "name": "hidden-chess-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "暗棋象棋 · 联机对战服务器（零依赖 Node.js，支持随机匹配 + 开房间）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

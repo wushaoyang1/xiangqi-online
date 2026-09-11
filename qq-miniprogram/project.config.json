@@ -1,0 +1,13 @@
+{
+  "appid": "YOUR_QQ_MINIPROGRAM_APPID",
+  "projectname": "anqi-chess",
+  "miniprogramRoot": "./",
+  "compileType": "miniprogram",
+  "libVersion": "latest",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true
+  }
+}

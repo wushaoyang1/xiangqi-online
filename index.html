@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>暗棋象棋 · Hidden Chess</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>暗棋象棋</h1>
+    <p class="subtitle">在传统象棋基础上加入一枚「暗棋」——只有你自己看得见，埋伏、挡路、同归于尽的博弈</p>
+    <button id="menuHomeBtn" class="menu-home" title="返回主菜单">☰</button>
+  </header>
+
+  <div class="main">
+    <div class="board-wrap">
+      <div id="board" class="board"></div>
+      <div id="danmakuLayer" class="danmaku-layer"></div>
+    </div>
+
+    <aside class="panel">
+      <div class="setup">
+        <label>对战模式：
+          <select id="modeSel">
+            <option value="pvp">双人（同屏）</option>
+            <option value="ai">单人对 AI</option>
+            <option value="online">联机对战（两台电脑）</option>
+          </select>
+        </label>
+        <div id="onlineOpts" class="ai-opts" style="display:none">
+          <div class="online-actions">
+            <button id="matchBtn" class="btn primary">🎲 随机匹配</button>
+            <button id="createBtn" class="btn">＋ 创建房间</button>
+          </div>
+          <div id="matchStatus" class="net-info" style="display:none"></div>
+          <button id="cancelMatchBtn" class="btn" style="display:none">取消匹配</button>
+          <hr class="sep">
+          <label>房间号（输入好友给的房间号进房）：
+            <input id="roomInput" class="room-input" maxlength="16" placeholder="例如 8888">
+          </label>
+          <button id="joinBtn" class="btn">进入房间</button>
+          <div id="netInfo" class="net-info">点「随机匹配」系统自动找对手；或点「创建房间」生成邀请链接发给好友。两者都不限同一 WiFi。</div>
+          <div id="inviteBox" class="invite-box" style="display:none"></div>
+          <hr class="sep">
+          <button id="spectateBtn" class="btn">👁️ 观战（先填上方房间号）</button>
+          <div id="recordBox" class="record-box" style="display:none"></div>
+          <hr class="sep">
+          <button id="inviteBtn" class="btn">🎁 邀请好友 / 我的邀请码</button>
+          <div id="invitePanel" class="invite-panel" style="display:none">
+            <div id="inviteStat" class="ip-stat">加载中…</div>
+            <input id="inviteLink" class="room-input" readonly>
+            <div class="ip-actions">
+              <button id="inviteCopyBtn" class="btn sm">📋 复制链接</button>
+              <button id="invitePosterBtn" class="btn sm">🖼 生成邀请海报</button>
+            </div>
+            <div class="ip-qr"><canvas id="inviteQrCanvas" width="176" height="176"></canvas></div>
+            <div class="ip-tip">好友通过你的链接或扫码进来，都会计入你的邀请人数</div>
+          </div>
+          <hr class="sep">
+          <button id="replayBtn" class="btn">📼 我的回放</button>
+          <div id="replayPanel" class="replay-panel" style="display:none">
+            <div class="rp-title">本机回放（每局结束自动保存，最多 20 局）</div>
+            <label class="rp-toggle"><input id="replayShowHidden" type="checkbox" checked> 👁 显示暗棋（仅本机已知位置）</label>
+            <select id="replayList" class="room-input"></select>
+            <div class="rp-actions">
+              <button id="replayPlayBtn" class="btn">▶ 播放</button>
+              <button id="replayImportBtn" class="btn">📁 导入文件</button>
+              <input id="replayFile" type="file" accept="application/json,.json" style="display:none">
+            </div>
+            <div id="replayBar" class="replay-bar" style="display:none">
+              <button id="replayRestartBtn" class="btn sm">⏮</button>
+              <button id="replayStepBtn" class="btn sm">⏭</button>
+              <input id="replaySlider" type="range" min="0" max="0" value="0" style="flex:1">
+              <span id="replayStepEl" class="rp-step">0 / 0</span>
+            </div>
+          </div>
+        </div>
+        <div id="aiOpts" class="ai-opts" style="display:none">
+          <label>AI 执子：
+            <select id="aiSideSel">
+              <option value="black">黑（你执红先手）</option>
+              <option value="red">红（你执黑后手）</option>
+            </select>
+          </label>
+          <label>难度：
+            <select id="diffSel">
+              <option value="easy">简单</option>
+              <option value="normal">普通</option>
+            </select>
+          </label>
+        </div>
+        <button id="applyBtn" class="btn">应用设置并重开</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div id="ratingLine" class="net-info" style="display:none"></div>
+
+      <div class="action-row">
+        <button id="newGameBtn" class="btn">重新开始</button>
+        <button id="undoBtn" class="btn">↩️ 悔棋</button>
+        <button id="resignBtn" class="btn danger">🏳️ 认输</button>
+        <button id="posterBtn" class="btn sm" style="display:none">🖼 战绩海报</button>
+        <button id="soundBtn" class="btn sm">🔊 音效</button>
+      </div>
+
+      <div class="tokens">
+        <div class="tk red">红方暗棋：<span id="redTokens">冷却</span></div>
+        <div class="tk black">黑方暗棋：<span id="blackTokens">冷却</span></div>
+      </div>
+
+      <div class="log" id="log"></div>
+
+      <div id="chatPanel" class="chat-panel" style="display:none">
+        <div class="chat-title">💬 联机聊天（玩家与观战者可见）</div>
+        <div id="chatMsgs" class="chat-msgs"></div>
+        <div class="chat-input">
+          <input id="chatInput" maxlength="120" placeholder="说点什么…（回车发送）">
+          <button id="chatSend" class="btn sm">发送</button>
+        </div>
+        <div class="danmaku-bar">
+          <div class="dm-quick">
+            <button class="dm-emoji" data-dm="👍">👍</button>
+            <button class="dm-emoji" data-dm="😂">😂</button>
+            <button class="dm-emoji" data-dm="🔥">🔥</button>
+            <button class="dm-emoji" data-dm="💪">💪</button>
+            <button class="dm-emoji" data-dm="😱">😱</button>
+            <button class="dm-emoji" data-dm="🎉">🎉</button>
+          </div>
+          <div class="chat-input">
+            <input id="danmakuInput" maxlength="30" placeholder="发个弹幕飘过棋盘…">
+            <button id="danmakuSend" class="btn sm">飘屏</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="rules">
+        <h3>玩法规则</h3>
+        <ul>
+          <li>双方在传统象棋外各多一枚<b>暗棋</b>，<b>只有你自己能看到</b>。</li>
+          <li><b>每回合先走 1 步普通棋子</b>；若该暗棋已就绪，棋盘会<b>自动高亮暗棋可走格</b>，点高亮格即可走暗棋（也可点棋盘右侧的「结束回合」跳过）。</li>
+          <li>暗棋机会<b>不叠加</b>（最多待行动 1 次）。走暗棋<b>不单独占回合</b>；行动后重新累计：<b>再走 2 步普通棋子</b>才可再次行动。</li>
+          <li>暗棋每次走 <b>1 格</b>，可走直线也可走<b>斜线</b>；能与普通棋子<b>重叠</b>（不阻挡）。</li>
+          <li><b>主动出击 · 吃掉敌子</b>：暗棋可<b>主动移动到敌方棋子所在格</b>，直接<b>吃掉对方并存活</b>（落点显示红色攻击环）。</li>
+          <li><b>阻挡 + 同归于尽</b>：任何棋子（含车、炮等直线棋子）前进路径上若<b>意外触碰</b>敌方暗棋，即触发同归于尽并播放<b>爆炸动画 + 提示</b>，不只限于落在暗棋上。</li>
+          <li>即便暗棋与友方棋子重叠，敌方吃掉该友方棋子时，<b>仍会触发同归于尽</b>。</li>
+          <li><b>被将军也可自由走子</b>：本作<b>不强制"应将"</b>——被将军时仍可走任意棋子，再用暗棋（后置阶段）去吃掉将军的子来解围；只有被<b>完全堵死、无任何子可动</b>才算无着可走。</li>
+          <li><b>单人也能玩</b>：选「单人对 AI」即可人机对战（AI 执黑或执红、可选难度）。人机模式<b>不会弹出交接遮罩</b>，你的暗棋只有你能看见。</li>
+          <li><b>联网对战（不限 WiFi）</b>：选「联机对战」后，点<b>「随机匹配」</b>系统自动分配在线对手，或点<b>「创建房间」</b>生成邀请链接发给好友。服务器部署在公网，<b>双方无需同一 WiFi</b> 也能对战。联机时<b>暗棋位置只存在于你自己的电脑上</b>，从不上传服务器，对方就算翻代码也看不到；对手棋子撞上你暗棋的判定，由<b>你这台电脑</b>裁决后再同步给对方。</li>
+          <li><b>观战 / 回放 / 战绩</b>：填房间号点<b>「观战」</b>即可旁观他人对局（暗棋位置对观战者始终隐藏）；每局结束<b>自动保存回放</b>到本机，点<b>「我的回放」</b>可随时回顾（也能导入别人分享的回放文件）。回放里勾选<b>「显示暗棋」</b>即可看到<b>本机已知</b>的暗棋位置（联机时仅你自己的暗棋；本地双人 / AI 两边都在本机则都显示）；你的<b>胜负战绩</b>自动记录在本机。</li>
+          <li><b>悔棋 / 认输 / 聊天 / 段位</b>：联机对局中可点<b>「悔棋」</b>向对手发起悔棋（需对方同意，暗棋坐标一并还原，保密不破）；点<b>「认输」</b>本局判你负；右侧<b>聊天框</b>可与对手 / 观战者实时交流（消息做了防注入处理）；每局结束按 <b>ELO 段位</b>结算，你的段位分显示在网络状态下方（胜加分、负减分，服务器持久保存）；右下角<b>「音效」</b>可随时开关落子 / 吃子 / 胜负等提示音。</li>
+          <li><b>晒战绩 / 邀请好友</b>：点<b>「战绩海报」</b>把本局胜负、段位分、总战绩生成一张<b>带二维码的图片</b>，保存后发微信朋友圈，好友<b>扫码直接进你的房间</b>；点<b>「邀请好友」</b>可看到自己的<b>专属邀请码与链接</b>，好友通过它进来会计入你的邀请人数，并解锁铜牌 / 银牌 / 金牌 / 钻石等<b>推广成就</b>。二维码由本机离线生成，<b>不经过任何第三方服务</b>。</li>
+          <li>传统象棋规则（将/士/象/马/车/炮/兵）全部保留，先吃掉对方「将/帅」者获胜。</li>
+        </ul>
+        <p class="tip">提示：同屏双人（hotseat）。轮到对方时请交接设备，点击「我准备好了」后再看棋盘，避免偷看对方暗棋。</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ===================== 主菜单 ===================== -->
+<div id="menu" class="menu">
+  <div class="menu-card">
+    <div class="menu-logo">♟️ 暗棋象棋</div>
+    <div class="menu-sub">在传统象棋里藏一枚只有你能看见的暗棋</div>
+
+    <!-- 主视图：开始游戏 + 次级功能 -->
+    <div id="menuMain" class="menu-main">
+      <button id="menuStartBtn" class="menu-start">▶ 开始游戏</button>
+      <div class="menu-grid">
+        <button class="menu-item" data-act="ai"><span class="mi-ico">🤖</span><span class="mi-text">人机练习</span></button>
+        <button class="menu-item" data-act="pvp"><span class="mi-ico">👥</span><span class="mi-text">同屏双人</span></button>
+        <button class="menu-item" data-act="replay"><span class="mi-ico">📼</span><span class="mi-text">战绩回放</span></button>
+        <button class="menu-item" data-act="rank"><span class="mi-ico">🏆</span><span class="mi-text">排行榜</span></button>
+        <button class="menu-item" data-act="ach"><span class="mi-ico">🏅</span><span class="mi-text">成就</span></button>
+        <button class="menu-item" data-act="friends"><span class="mi-ico">👫</span><span class="mi-text">好友</span></button>
+        <button class="menu-item" data-act="tutorial"><span class="mi-ico">📖</span><span class="mi-text">新手教程</span></button>
+        <button class="menu-item" data-act="invite"><span class="mi-ico">🎁</span><span class="mi-text">邀请有礼</span></button>
+        <button class="menu-item" data-act="settings"><span class="mi-ico">⚙️</span><span class="mi-text">设置</span></button>
+      </div>
+    </div>
+
+    <!-- 开始游戏子视图：匹配 / 排位 / 开房间 -->
+    <div id="menuStart" class="menu-start-view" style="display:none">
+      <button id="menuBackBtn" class="menu-back">‹ 返回</button>
+      <div class="menu-modes">
+        <button class="mode-card" data-mode="match">
+          <div class="mode-ico">🎲</div>
+          <div class="mode-name">匹配</div>
+          <div class="mode-desc">随机匹配在线对手，休闲对局<b>不计段位</b></div>
+        </button>
+        <button class="mode-card" data-mode="ranked">
+          <div class="mode-ico">🏆</div>
+          <div class="mode-name">排位赛</div>
+          <div class="mode-desc">影响你的 ELO 段位分，胜负<b>计入排名</b></div>
+        </button>
+        <button class="mode-card" data-mode="room">
+          <div class="mode-ico">🚪</div>
+          <div class="mode-name">开房间</div>
+          <div class="mode-desc">创建房间把链接发给好友，<b>无需同 WiFi</b></div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- ===================== 设置 ===================== -->
+<div id="settingsModal" class="settings-modal" style="display:none">
+  <div class="settings-card">
+    <div class="settings-head">
+      <h2>⚙️ 设置</h2>
+      <button id="settingsCloseBtn" class="btn danger">关闭</button>
+    </div>
+    <div class="settings-body">
+
+      <section class="set-sec">
+        <h3>🔊 音频</h3>
+        <div class="set-row">
+          <label class="set-label">背景音乐</label>
+          <div class="set-ctrl">
+            <label class="switch"><input type="checkbox" id="setMusic"><span class="slider"></span></label>
+            <input type="range" id="setMusicVol" min="0" max="100" value="50" class="vol">
+            <span id="setMusicVolVal" class="set-val">50%</span>
+          </div>
+        </div>
+        <div class="set-row">
+          <label class="set-label">音效（落子 / 吃子 / 胜负）</label>
+          <div class="set-ctrl">
+            <label class="switch"><input type="checkbox" id="setSfx"><span class="slider"></span></label>
+            <input type="range" id="setSfxVol" min="0" max="100" value="70" class="vol">
+            <span id="setSfxVolVal" class="set-val">70%</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="set-sec">
+        <h3>🔒 隐私</h3>
+        <div class="set-row">
+          <label class="set-label">允许被随机匹配<div class="set-sub">关闭后，别人无法匹配到你（仍可与好友开房间）</div></label>
+          <label class="switch"><input type="checkbox" id="setAllowMatch"><span class="slider"></span></label>
+        </div>
+        <div class="set-row">
+          <label class="set-label">战绩海报隐藏段位<div class="set-sub">生成海报时不显示具体分数，只展示胜负</div></label>
+          <label class="switch"><input type="checkbox" id="setHideRating"><span class="slider"></span></label>
+        </div>
+        <div class="set-row">
+          <label class="set-label">清除本机数据<div class="set-sub">回放、战绩、暗棋缓存、邀请绑定等（不影响段位与服务端数据）</div></label>
+          <button id="setClearBtn" class="btn sm danger">清除</button>
+        </div>
+      </section>
+
+      <section class="set-sec">
+        <h3>🎨 外观</h3>
+        <div class="set-row">
+          <label class="set-label">棋盘主题</label>
+          <select id="setBoardTheme" class="room-input">
+            <option value="classic">经典木纹</option>
+            <option value="dark">现代深色</option>
+            <option value="light">简约浅色</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <label class="set-label">高亮可走位置</label>
+          <label class="switch"><input type="checkbox" id="setShowHl"><span class="slider"></span></label>
+        </div>
+        <div class="set-row">
+          <label class="set-label">特效动画（爆炸 / 吃子）</label>
+          <label class="switch"><input type="checkbox" id="setFx"><span class="slider"></span></label>
+        </div>
+        <div class="set-row">
+          <label class="set-label">手机震动（翻棋 / 吃子）</label>
+          <label class="switch"><input type="checkbox" id="setVibrate"><span class="slider"></span></label>
+        </div>
+      </section>
+
+      <section class="set-sec">
+        <h3>🧰 其他</h3>
+        <div class="set-row">
+          <label class="set-label">全屏模式</label>
+          <button id="setFullBtn" class="btn sm">进入全屏</button>
+        </div>
+        <div class="set-row">
+          <label class="set-label">恢复默认设置</label>
+          <button id="setResetBtn" class="btn sm">恢复默认</button>
+        </div>
+        <div class="set-row set-ver">暗棋象棋 · 纯前端 · 本地优先 · v1.3</div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div id="gate" class="gate">
+  <div class="gate-inner">
+    <h2 id="gateText"></h2>
+    <p class="gate-hint"></p>
+    <button id="gateBtn" class="btn">我准备好了</button>
+  </div>
+</div>
+
+<!-- 同屏双人交接遮罩：过场式、非阻塞（约 1.3 秒自动消失，也可点一下立即消失），交接设备时盖住棋盘避免看到对方暗棋 -->
+<div id="handoff" class="handoff" style="display:none">
+  <div class="handoff-inner">
+    <div id="handoffText" class="handoff-text"></div>
+    <div class="handoff-hint">请把设备交给对应玩家 · 点击任意处开始</div>
+  </div>
+</div>
+
+<!-- 胜利结算弹窗：吃将后弹出「某方胜利」四字 + 背景光芒四射 -->
+<div id="victory" class="victory" style="display:none">
+  <div class="vic-rays"></div>
+  <div class="vic-glow"></div>
+  <div class="vic-card">
+    <div id="victoryText" class="vic-text"></div>
+    <div id="victorySub" class="vic-sub"></div>
+    <div class="vic-actions">
+      <button id="victoryRestartBtn" class="btn vic-btn">🔄 再来一局</button>
+      <button id="victoryCloseBtn" class="btn danger vic-btn">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="undoPrompt" class="undo-prompt" style="display:none">
+  <div class="undo-card">
+    <div class="undo-text"></div>
+    <div class="undo-actions">
+      <button class="btn undo-accept">✅ 同意</button>
+      <button class="btn danger undo-reject">⛔ 拒绝</button>
+    </div>
+  </div>
+</div>
+
+<div id="posterModal" class="poster-modal" style="display:none">
+  <div class="poster-card">
+    <img id="posterImg" class="poster-img copyable" alt="分享海报">
+    <div class="poster-actions">
+      <button id="posterSaveBtn" class="btn">💾 保存图片</button>
+      <button id="posterCopyBtn" class="btn">📋 复制图片</button>
+      <button id="posterShareBtn" class="btn">📤 分享</button>
+      <button id="posterCloseBtn" class="btn danger">关闭</button>
+    </div>
+    <div class="poster-tip">保存后可发微信 / 朋友圈，好友扫码即可开战</div>
+  </div>
+</div>
+
+<!-- ===================== 段位天梯 ===================== -->
+<div id="ladderModal" class="modal-x" style="display:none">
+  <div class="modal-card">
+    <div class="modal-head"><h2>🏆 段位天梯</h2><button class="btn danger" data-close="ladderModal">关闭</button></div>
+    <div class="modal-body">
+      <div id="ladderMy" class="ladder-my"></div>
+      <div class="ladder-progress"><div id="ladderBar" class="ladder-bar"></div><span id="ladderNext" class="ladder-next"></span></div>
+      <div class="ladder-sub">📋 当前赛季排行榜 <span id="ladderSeason" class="ladder-season"></span>（Top 50）</div>
+      <div id="leaderboard" class="leaderboard"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 成就 ===================== -->
+<div id="achModal" class="modal-x" style="display:none">
+  <div class="modal-card">
+    <div class="modal-head"><h2>🏅 我的成就</h2><button class="btn danger" data-close="achModal">关闭</button></div>
+    <div class="modal-body"><div id="achGrid" class="ach-grid"></div></div>
+  </div>
+</div>
+
+<!-- ===================== 好友 ===================== -->
+<div id="friendsModal" class="modal-x" style="display:none">
+  <div class="modal-card">
+    <div class="modal-head"><h2>👫 好友</h2><button class="btn danger" data-close="friendsModal">关闭</button></div>
+    <div class="modal-body">
+      <div class="friend-add">
+        <input id="friendCode" class="room-input" maxlength="8" placeholder="好友邀请码">
+        <input id="friendName" class="room-input" maxlength="12" placeholder="备注名（可选）">
+        <button id="friendAddBtn" class="btn sm">添加</button>
+      </div>
+      <div class="friend-tip">添加好友需对方的「邀请码」（在他「邀请有礼」里查看）。好友在线时可一键约战进同一房间。</div>
+      <div id="friendList" class="friend-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 新手教程 ===================== -->
+<div id="tutorialModal" class="modal-x tutorial-x" style="display:none">
+  <div class="modal-card tutorial-card">
+    <div id="tutorialText" class="tutorial-text"></div>
+    <div class="tutorial-actions">
+      <button id="tutorialSkip" class="btn sm">跳过</button>
+      <button id="tutorialNext" class="btn primary">下一步</button>
+    </div>
+    <div id="tutorialDots" class="tutorial-dots"></div>
+  </div>
+</div>
+
+<!-- ===================== AI 复盘分析 ===================== -->
+<div id="reviewModal" class="modal-x" style="display:none">
+  <div class="modal-card">
+    <div class="modal-head"><h2>🤖 AI 复盘分析</h2><button class="btn danger" data-close="reviewModal">关闭</button></div>
+    <div class="modal-body">
+      <div id="reviewScore" class="review-score"></div>
+      <div id="reviewList" class="review-list"></div>
+    </div>
+  </div>
+</div>
+
+<script src="qr.js"></script>
+<script src="poster.js"></script>
+<script src="net.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Render 部署配置（一键部署用）
+# 把本仓库连到 Render 后，它会自动按这个文件启动，无需在网页上手工填命令。
+services:
+  - type: web
+    name: anqi-xiangqi
+    runtime: node
+    plan: free                      # 免费档，不用绑卡
+    region: singapore               # 新加坡节点，离国内近、延迟低
+    branch: main
+    buildCommand: ""                # 本项目零依赖，无需编译
+    startCommand: node server.js    # 启动服务器的命令
+    healthCheckPath: /api/rooms     # 健康检查：Render 用这个接口判断服务是否活着
+    # 端口不用写：Render 会自动注入 PORT 环境变量，server.js 已支持读取
