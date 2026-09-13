@@ -243,10 +243,15 @@ function sendJSON(res, code, obj){
   res.end(body);
 }
 
-function readBody(req){
+function readBody(req, limit = 1 * 1024 * 1024){   // 限制请求体最大 1MB，防止超大 POST 撑爆内存（公开部署防 DoS）
   return new Promise((resolve) => {
     const chunks = [];
-    req.on('data', d => chunks.push(d));
+    let total = 0;
+    req.on('data', d => {
+      total += d.length;
+      if (total > limit){ try { req.destroy(); } catch(e){} resolve({}); return; }
+      chunks.push(d);
+    });
     req.on('end', () => {
       const raw = Buffer.concat(chunks).toString('utf8');   // 先拼 Buffer 再解码，避免中文被截断
       try { resolve(raw ? JSON.parse(raw) : {}); }
@@ -272,6 +277,14 @@ function serveStatic(req, res, urlPath){
   try { rel = decodeURIComponent(urlPath.split('?')[0]); }   // 畸形 % 序列会抛 URIError，不能让它带崩进程
   catch(e){ res.writeHead(400); res.end('bad request'); return; }
   if (rel === '/' || rel === '') rel = '/index.html';
+  // —— 安全：禁止访问隐藏文件(.git/.env 等)、源码与数据文件，避免公开后源码/用户数据被下载 ——
+  if (rel.split('/').some(seg => seg.startsWith('.'))){
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('forbidden'); return;
+  }
+  const _base = path.basename(rel).toLowerCase();
+  if (['server.js','package.json','render.yaml','.gitignore','ratings.json','invites.json','friends.json','seasons.json'].includes(_base)){
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('forbidden'); return;
+  }
   const full = path.join(ROOT, rel);
   if (!full.startsWith(ROOT)){ res.writeHead(403); res.end('forbidden'); return; }   // 防目录穿越
   fs.readFile(full, (err, buf) => {
@@ -669,6 +682,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 // 不指定 host：Node 默认双栈监听，IPv4(192.168.x.x) 和 IPv6(localhost/::1) 都能连
+server.maxConnections = 2000;   // 超过则拒绝新连接，防止公开部署被大量连接耗尽文件描述符
+server.timeout = 60000;          // 单个连接最长 60s 未活动即断开，回收空闲长轮询
 loadRatings();   // 启动即加载已有段位，保证断线/重启后段位不丢
 loadInvites();   // 邀请码与邀请关系同理，重启不丢
 loadSeasons();   // 赛季状态：按季度自动滚动，跨赛季清零
