@@ -61,6 +61,9 @@ let snapHistory = [];           // 悔棋快照栈：每个回合开始时记录
 let _applyingHistory = false;   // 正在回放历史消息（重连/观战）时，禁止记录快照
 let undoRequestSide = null;     // 收到的「悔棋请求」来自哪一方（待本机同意/拒绝）
 let chatMsgsEl = null, chatInputEl = null, chatSendEl = null, chatPanelEl = null;
+let infoPanelEl = null, tabChatEl = null, tabRulesEl = null, infoCollapseEl = null, rulesPanelEl = null;
+let infoTab = 'chat';          // 信息面板当前标签：'chat' 聊天 / 'rules' 规则
+let infoCollapsed = false;     // 信息面板是否收起（收起后只剩头部按钮）
 let ratingLineEl = null, soundBtnEl = null, undoBtnEl = null, resignBtnEl = null, undoPromptEl = null;
 // 邀请裂变 / 海报相关 DOM
 let inviteBtnEl = null, invitePanelEl = null, inviteLinkEl = null, inviteStatEl = null,
@@ -1630,6 +1633,59 @@ async function renderInvitePanel(){
 }
 
 /* —— 海报 —— */
+
+// 信息面板（聊天/规则）标签页切换
+function showInfoTab(tab){
+  if (!chatPanelEl || !rulesPanelEl || !tabChatEl || !tabRulesEl) return;
+  infoTab = tab;
+  if (tab === 'chat'){
+    tabChatEl.classList.add('active'); tabRulesEl.classList.remove('active');
+    chatPanelEl.style.display = 'block';  rulesPanelEl.style.display = 'none';
+  } else {
+    tabRulesEl.classList.add('active'); tabChatEl.classList.remove('active');
+    chatPanelEl.style.display = 'none';   rulesPanelEl.style.display = 'block';
+  }
+}
+
+// 邀请链接 / 扫码进房：自动以玩家身份进房；房间满员（红黑都有人）则自动转观战
+async function autoJoinFromUrl(){
+  let room = null;
+  try { room = new URLSearchParams(location.search).get('room'); } catch(e){}
+  if (!room) return;
+  room = room.trim();
+  if (!room) return;
+  // 确保联机面板就绪
+  if (typeof modeSel !== 'undefined' && modeSel) modeSel.value = 'online';
+  if (typeof onlineOptsEl !== 'undefined' && onlineOptsEl) onlineOptsEl.style.display = 'block';
+  if (typeof aiOptsEl !== 'undefined' && aiOptsEl) aiOptsEl.style.display = 'none';
+  if (typeof roomInput !== 'undefined' && roomInput) roomInput.value = room;
+  config.mode = 'online';
+  // 先问服务器该房间是否已满员（红黑双方都在）
+  let full = false;
+  try {
+    const list = await fetch('/api/rooms').then(x => x.json());
+    const r = list && list.rooms && list.rooms.find(x => x.room === room);
+    if (r && r.red && r.black) full = true;
+  } catch(e){}
+  if (Net.joined) Net.leave();
+  if (full){
+    setNetInfo('该房间已有两位玩家，自动进入观战席 🔭', 'wait');
+    Net.spectate(room);
+    return;
+  }
+  setNetInfo('正在进入好友房间 ' + room + '…', 'wait');
+  let res = null;
+  try { res = await Net.join(room); } catch(e){}
+  if (!res || !res.ok || !res.side){
+    // 进房失败（满员或服务异常）→ 兜底转观战
+    setNetInfo('无法以玩家身份进入，已转为观战 🔭', 'wait');
+    try { Net.spectate(room); } catch(e){}
+    return;
+  }
+  if (typeof chatPanelEl !== 'undefined') showInfoTab('chat');
+  showInvite(room);
+}
+
 function posterCommon(){
   const hide = !!Settings.get('hideRatingPoster');
   return {
@@ -2379,7 +2435,15 @@ function render(){
     resignBtnEl.style.display = playing ? '' : 'none';
     resignBtnEl.disabled = !playing || state.gameOver || state.showGate;
   }
-  if (chatPanelEl) chatPanelEl.style.display = onlineLike ? 'block' : 'none';
+  // 信息面板：联机/观战时聊天标签可用并默认显示；非联机自动切到规则标签
+  if (chatPanelEl && rulesPanelEl && tabChatEl && tabRulesEl){
+    if (!onlineLike){
+      if (infoTab === 'chat') showInfoTab('rules');
+      tabChatEl.disabled = true; tabChatEl.style.opacity = '0.5';
+    } else {
+      tabChatEl.disabled = false; tabChatEl.style.opacity = '1';
+    }
+  }
   if (ratingLineEl) ratingLineEl.style.display = onlineLike ? 'block' : 'none';
   // 战绩海报：联机时随时可生成；单机 / 人机则对局结束后才有意义
   if (posterBtnEl){
@@ -2972,9 +3036,23 @@ function init(){
   replayStepEl     = document.getElementById('replayStepEl');
   replayShowHiddenEl = document.getElementById('replayShowHidden');
   chatPanelEl      = document.getElementById('chatPanel');
+  rulesPanelEl     = document.getElementById('rulesPanel');
+  infoPanelEl      = document.getElementById('infoPanel');
+  tabChatEl        = document.getElementById('tabChat');
+  tabRulesEl       = document.getElementById('tabRules');
+  infoCollapseEl   = document.getElementById('infoCollapse');
   chatMsgsEl       = document.getElementById('chatMsgs');
   chatInputEl      = document.getElementById('chatInput');
   chatSendEl       = document.getElementById('chatSend');
+  // 信息面板：聊天/规则 标签切换 + 收起
+  if (tabChatEl)  tabChatEl.addEventListener('click', () => showInfoTab('chat'));
+  if (tabRulesEl) tabRulesEl.addEventListener('click', () => showInfoTab('rules'));
+  if (infoCollapseEl) infoCollapseEl.addEventListener('click', () => {
+    if (!infoPanelEl) return;
+    infoCollapsed = !infoCollapsed;
+    infoPanelEl.classList.toggle('collapsed', infoCollapsed);
+  });
+  showInfoTab('chat');   // 默认显示联机聊天
   ratingLineEl     = document.getElementById('ratingLine');
   soundBtnEl       = document.getElementById('soundBtn');
   undoBtnEl        = document.getElementById('undoBtn');
@@ -3278,7 +3356,7 @@ function init(){
   Settings.load();
   Settings.applyAll();          // 应用主题/音效/音乐等（会再 render 一次，确保棋盘主题色生效）
   bindInviteFromUrl();          // 若是好友邀请链接（?inv=）进来的，上报一次绑定
-  if (qRoom) doJoin();          // 邀请链接进来的，直接进房
+  if (qRoom) autoJoinFromUrl();  // 邀请链接进来的，自动进房（满员自动转观战）
   else {
     // 自动续上次的联机对局：刷新/关闭页面后回来，若房间仍在则恢复（支持"匹配后刷新重连"）
     let lastRoom = null;

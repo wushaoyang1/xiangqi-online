@@ -853,3 +853,22 @@ body { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color
 .ip-qr { display: flex; justify-content: center; margin: 10px 0 2px; }
 .ip-qr canvas { width: 176px; height: 176px; background: #fff; border-radius: 8px; padding: 6px;
   box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+
+/* ===================== 信息面板：聊天/规则 合并为可折叠标签页 ===================== */
+.info-panel { background: linear-gradient(180deg, #30323d, #2a2c35); border: 1px solid rgba(255,255,255,.05);
+  border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+.info-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; }
+.info-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.info-tab { background: #3a3a44; color: #cfcfd8; border: none; border-radius: 8px; padding: 6px 12px;
+  font-size: 13px; cursor: pointer; transition: background .15s, color .15s; }
+.info-tab:hover { background: #454552; }
+.info-tab.active { background: #5b8def; color: #fff; }
+.info-tab:disabled { cursor: not-allowed; opacity: .5; }
+.info-collapse { background: transparent; border: none; color: #cfcfd8; font-size: 18px; line-height: 1;
+  cursor: pointer; padding: 2px 8px; transition: transform .15s; }
+.info-panel.collapsed .info-body { display: none; }
+.info-panel.collapsed .info-collapse { transform: rotate(-90deg); }
+.info-body { padding: 0 10px 10px; }
+/* 在信息面板内去掉重复背景，由外层 .info-panel 统一提供 */
+.info-panel .chat-panel, .info-panel .rules { background: transparent; border: none; padding: 0; margin-bottom: 0; border-radius: 0; }
+.info-panel .rules .tip { margin: 8px 0 0; }
